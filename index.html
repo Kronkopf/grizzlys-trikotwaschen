@@ -140,11 +140,16 @@
   // ====== EINMALIGE EINRICHTUNG ======
   // 1) Auf https://getpantry.cloud gehen, "Create a Pantry" klicken, Name + Email eintragen.
   // 2) Die dort erzeugte Pantry-ID (ein langer Code) hier unten einfügen:
-  var PANTRY_ID = "d4960c18-94fb-4a62-8765-69e9dc9bd37b";
+  var PANTRY_ID = "PASTE_YOUR_PANTRY_ID_HERE";
   var BASKET_NAME = "trikotwaschen";
   // ====================================
 
-  var STATE = {"players":["Bornemann","Gebauer","Greska","Hinz","Huttary","Kellerer","Mayer","Michalsky","Niedermaier","Obermair","Paul","Pelzl","Pflaum","Sanftl","Stadler Al.","Stadler An.","Wallner","Zuran","Zwerschina","Zwölfer","Heinzl"],"history":[{"player":"Gebauer","date":"2026-09-30T11:51:56.703Z"},{"player":"Sanftl","date":"2026-09-30T11:52:44.130Z"}]};
+  var DEFAULT_STATE = {"players":["Bornemann","Gebauer","Greska","Hinz","Huttary","Kellerer","Mayer","Michalsky","Niedermaier","Obermair","Paul","Pelzl","Pflaum","Sanftl","Stadler Al.","Stadler An.","Wallner","Zuran","Zwerschina","Zwölfer","Heinzl"],"history":[{"player":"Gebauer","date":"2026-09-30T11:51:56.703Z"},{"player":"Sanftl","date":"2026-09-30T11:52:44.130Z"}]};
+  var STATE = JSON.parse(JSON.stringify(DEFAULT_STATE));
+
+  function isValidName(n){
+    return typeof n === "string" && n.length > 0 && n.length <= 30 && !/[<>{}]/.test(n);
+  }
 
   var isSetup = PANTRY_ID && PANTRY_ID.indexOf("PASTE_") !== 0;
   var apiBase = "https://getpantry.cloud/apiv1/pantry/" + PANTRY_ID + "/basket/" + BASKET_NAME;
@@ -247,6 +252,11 @@
     var input = document.getElementById('newPlayer');
     var name = (input.value || '').trim();
     if(!name) return;
+    if(name.length > 30 || /[<>{}]/.test(name)){
+      alert('Ungültiger Name. Bitte nur normalen Text ohne Sonderzeichen wie < > { } eingeben.');
+      return;
+    }
+    if(STATE.players.indexOf(name) !== -1) { input.value=''; return; }
     STATE.players.push(name);
     input.value = '';
     persist();
@@ -291,9 +301,23 @@
       })
       .then(function(data){
         if(data && Array.isArray(data.players)){
-          STATE = data;
+          // Nur ungültige/bösartige Einträge rausfiltern - echte Hinzufügungen/
+          // Entfernungen des Teams bleiben dabei erhalten.
+          var cleanPlayers = data.players.filter(isValidName);
+          var wasCorrupted = cleanPlayers.length !== data.players.length;
+          if(cleanPlayers.length === 0){
+            // Kompletter Datensatz leer/kaputt -> auf Ausgangskader zurückfallen
+            cleanPlayers = DEFAULT_STATE.players.slice();
+            wasCorrupted = true;
+          }
+          var cleanHistory = (Array.isArray(data.history) ? data.history : []).filter(function(h){
+            return h && isValidName(h.player) && cleanPlayers.indexOf(h.player) !== -1;
+          });
+          STATE = {players: cleanPlayers, history: cleanHistory};
+          render();
+          if(wasCorrupted){ saveRemote(); }
         } else {
-          saveRemote(); // basket empty/malformed -> initialize with our default
+          saveRemote(); // basket leer/kaputt -> mit Default initialisieren
         }
         render();
       })
