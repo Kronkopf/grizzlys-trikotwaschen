@@ -99,6 +99,8 @@
   }
   .setupBanner code{background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:5px;}
   .syncdot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;}
+  #moreWashedCard{opacity:0.82;}
+  #moreWashedCard .poolitem{border-color:var(--border);}
 </style>
 </head>
 <body>
@@ -119,12 +121,17 @@
   <div class="sub" id="subtitle"><span class="ic">🧼</span> Rotation wird geladen …</div>
 
   <div class="card">
-    <h2><span class="ic">🫧</span> Aktuell dran (alle)</h2>
+    <h2><span class="ic">🫧</span> Aktuell dran</h2>
     <div class="poolgrid" id="poolGrid"></div>
     <div class="addrow">
       <input type="text" id="newPlayer" placeholder="Spieler hinzufügen …" maxlength="40">
       <button class="btn-secondary" id="addBtn">+ Hinzufügen</button>
     </div>
+  </div>
+
+  <div class="card" id="moreWashedCard" style="display:none;">
+    <h2><span class="ic">✅</span> Haben schon öfter gewaschen</h2>
+    <div class="poolgrid" id="poolGridMore"></div>
   </div>
 
   <div class="card">
@@ -192,32 +199,54 @@
     document.getElementById('subtitle').innerHTML =
       '<span class="ic">🧼</span> ' + (n === 0 ? "Noch keine Spieler in der Rotation." : n + " Spieler, alle aktuell dran");
 
-    var pool = STATE.players.slice().sort(function(a, b){
+    var counts = {};
+    STATE.players.forEach(function(p){ counts[p] = washCount(p); });
+    var minCount = STATE.players.length ? Math.min.apply(null, STATE.players.map(function(p){ return counts[p]; })) : 0;
+
+    var mainGroup = STATE.players.filter(function(p){ return counts[p] === minCount; });
+    var moreGroup = STATE.players.filter(function(p){ return counts[p] > minCount; });
+
+    function sortByLast(a, b){
       var da = lastWashed(a), db = lastWashed(b);
       if(!da && !db) return 0;
       if(!da) return -1;
       if(!db) return 1;
       return new Date(da) - new Date(db);
+    }
+    mainGroup.sort(sortByLast);
+    moreGroup.sort(function(a, b){
+      return counts[a] - counts[b] || sortByLast(a, b);
     });
 
+    function renderPoolItem(p){
+      var lw = lastWashed(p);
+      var wc = washCount(p);
+      return '<div class="poolitem">' +
+        '<div>' +
+          '<div class="pname">' + escapeHtml(p) + '<span class="countbadge">' + wc + 'x</span></div>' +
+          '<div class="plast">' + (lw ? 'Zuletzt: ' + fmtDate(lw) : 'Noch nie gewaschen') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+          '<button class="btn-primary" data-take="' + escapeHtml(p) + '">✓ Trikots gewaschen</button>' +
+          '<button class="btn-danger" data-remove="' + escapeHtml(p) + '">×</button>' +
+        '</div>' +
+        '</div>';
+    }
+
     var pg = document.getElementById('poolGrid');
-    if(pool.length === 0){
+    if(mainGroup.length === 0){
       pg.innerHTML = '<div class="empty">Füge unten Spieler hinzu, um zu starten.</div>';
     } else {
-      pg.innerHTML = pool.map(function(p){
-        var lw = lastWashed(p);
-        var wc = washCount(p);
-        return '<div class="poolitem">' +
-          '<div>' +
-            '<div class="pname">' + escapeHtml(p) + '<span class="countbadge">' + wc + 'x</span></div>' +
-            '<div class="plast">' + (lw ? 'Zuletzt: ' + fmtDate(lw) : 'Noch nie gewaschen') + '</div>' +
-          '</div>' +
-          '<div style="display:flex;gap:6px;">' +
-            '<button class="btn-primary" data-take="' + escapeHtml(p) + '">✓ Übernehmen</button>' +
-            '<button class="btn-danger" data-remove="' + escapeHtml(p) + '">×</button>' +
-          '</div>' +
-          '</div>';
-      }).join('');
+      pg.innerHTML = mainGroup.map(renderPoolItem).join('');
+    }
+
+    var moreCard = document.getElementById('moreWashedCard');
+    var pgMore = document.getElementById('poolGridMore');
+    if(moreGroup.length === 0){
+      moreCard.style.display = 'none';
+    } else {
+      moreCard.style.display = 'block';
+      pgMore.innerHTML = moreGroup.map(renderPoolItem).join('');
     }
 
     var hl = document.getElementById('historyList');
