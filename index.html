@@ -123,7 +123,7 @@
   <div class="card">
     <h2><span class="ic">🫧</span> Aktuell dran</h2>
     <div class="poolgrid" id="poolGrid"></div>
-    <div class="addrow">
+    <div class="addrow" id="addrow" style="display:none;">
       <input type="text" id="newPlayer" placeholder="Spieler hinzufügen …" maxlength="40">
       <button class="btn-secondary" id="addBtn">+ Hinzufügen</button>
     </div>
@@ -139,7 +139,10 @@
     <div id="historyList"></div>
   </div>
 
-  <div class="foot" id="footStatus"><span>🏒 Grizzlys Grafing</span></div>
+  <div class="foot" id="footStatus">
+    <span>🏒 Grizzlys Grafing</span>
+    <span style="margin-left:8px;cursor:pointer;" id="adminToggle">🔒</span>
+  </div>
 </div>
 
 <script>
@@ -159,6 +162,27 @@
   }
 
   var isSetup = PANTRY_ID && PANTRY_ID.indexOf("PASTE_") !== 0;
+  var ADMIN_PASSWORD = "Wäsche";
+  var isAdmin = false;
+  try { isAdmin = localStorage.getItem('trikotAdmin') === '1'; } catch(e){}
+
+  function toggleAdmin(){
+    if(isAdmin){
+      isAdmin = false;
+      try { localStorage.removeItem('trikotAdmin'); } catch(e){}
+      render();
+      return;
+    }
+    var pw = prompt('Admin-Passwort eingeben, um Spieler hinzufügen/löschen zu können:');
+    if(pw === null) return;
+    if(pw.trim().toLowerCase() === ADMIN_PASSWORD.toLowerCase()){
+      isAdmin = true;
+      try { localStorage.setItem('trikotAdmin', '1'); } catch(e){}
+      render();
+    } else {
+      alert('Falsches Passwort.');
+    }
+  }
   var apiBase = "https://getpantry.cloud/apiv1/pantry/" + PANTRY_ID + "/basket/" + BASKET_NAME;
 
   function fmtDate(iso){
@@ -228,7 +252,7 @@
         '</div>' +
         '<div style="display:flex;gap:6px;">' +
           '<button class="btn-primary" data-take="' + escapeHtml(p) + '">✓ Trikots gewaschen</button>' +
-          '<button class="btn-danger" data-remove="' + escapeHtml(p) + '">×</button>' +
+          (isAdmin ? '<button class="btn-danger" data-remove="' + escapeHtml(p) + '">×</button>' : '') +
         '</div>' +
         '</div>';
     }
@@ -259,7 +283,13 @@
     }
 
     document.getElementById('footStatus').innerHTML =
-      '<span class="syncdot"></span><span>' + (isSetup ? 'Geteilt mit dem Team' : 'Nur lokal in diesem Browser') + '</span>';
+      '<span class="syncdot"></span><span>' + (isSetup ? 'Geteilt mit dem Team' : 'Nur lokal in diesem Browser') + '</span>' +
+      '<span style="margin-left:8px;cursor:pointer;" id="adminToggle">' + (isAdmin ? '🔓' : '🔒') + '</span>';
+
+    document.getElementById('addrow').style.display = isAdmin ? 'flex' : 'none';
+
+    var adminToggle = document.getElementById('adminToggle');
+    if(adminToggle) adminToggle.onclick = toggleAdmin;
 
     wireEvents();
   }
@@ -278,6 +308,7 @@
   }
 
   function addPlayer(){
+    if(!isAdmin) return;
     var input = document.getElementById('newPlayer');
     var name = (input.value || '').trim();
     if(!name) return;
@@ -292,6 +323,7 @@
   }
 
   function removePlayer(name){
+    if(!isAdmin) return;
     var idx = STATE.players.indexOf(name);
     if(idx === -1) return;
     STATE.players.splice(idx, 1);
