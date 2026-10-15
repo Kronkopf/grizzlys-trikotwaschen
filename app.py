@@ -417,7 +417,7 @@ with tab_scan:
                         "HTTP-Referer": "https://kronkorken.streamlit.app",
                     },
                     json={
-                        "model": "meta-llama/llama-4-maverick",
+                        "model": MODELLE[0],
                         "messages": [{"role": "user", "content": "Say hello in one word"}],
                         "max_tokens": 10,
                     },
